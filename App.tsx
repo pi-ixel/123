@@ -30,28 +30,56 @@ const escapeCSV = (str: string | number | undefined) => {
   return stringValue;
 };
 
-const parseCSVLine = (line: string) => {
-  const result: string[] = [];
-  let current = '';
+// Robust CSV Parser handling multilines
+const parseCSV = (text: string): string[][] => {
+  const rows: string[][] = [];
+  let currentRow: string[] = [];
+  let currentCell = '';
   let inQuotes = false;
-  for (let i = 0; i < line.length; i++) {
-    const char = line[i];
-    if (char === '"') {
-      if (inQuotes && line[i + 1] === '"') {
-        current += '"';
-        i++;
+  
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    const nextChar = text[i + 1];
+    
+    if (inQuotes) {
+      if (char === '"') {
+        if (nextChar === '"') {
+          currentCell += '"';
+          i++; // Skip next quote escape
+        } else {
+          inQuotes = false;
+        }
       } else {
-        inQuotes = !inQuotes;
+        currentCell += char;
       }
-    } else if (char === ',' && !inQuotes) {
-      result.push(current);
-      current = '';
     } else {
-      current += char;
+      if (char === '"' && currentCell.length === 0) {
+        // Start of a quoted cell
+        inQuotes = true;
+      } else if (char === ',') {
+        currentRow.push(currentCell);
+        currentCell = '';
+      } else if (char === '\r' || char === '\n') {
+        if (char === '\r' && nextChar === '\n') {
+          i++;
+        }
+        currentRow.push(currentCell);
+        rows.push(currentRow);
+        currentRow = [];
+        currentCell = '';
+      } else {
+        currentCell += char;
+      }
     }
   }
-  result.push(current);
-  return result;
+  
+  // Handle last cell/row
+  if (currentCell.length > 0 || currentRow.length > 0) {
+    currentRow.push(currentCell);
+    rows.push(currentRow);
+  }
+  
+  return rows;
 };
 
 // Storage Keys
@@ -283,11 +311,16 @@ function App() {
       if (!text) return;
 
       try {
-        const lines = text.split(/\r?\n/).filter(line => line.trim() !== '');
-        if (lines.length < 2) throw new Error('Invalid CSV format');
+        // Use robust parser instead of splitting by line
+        const rows = parseCSV(text);
+        
+        // Filter out empty rows (e.g. trailing newlines)
+        const cleanRows = rows.filter(row => row.length > 0 && !(row.length === 1 && row[0].trim() === ''));
+
+        if (cleanRows.length < 2) throw new Error('Invalid CSV format');
 
         // Parse Header
-        const headers = parseCSVLine(lines[0]); 
+        const headers = cleanRows[0]; 
         // Expected: Dimension, Type, Software1, Software2...
         if (headers.length < 3) throw new Error('CSV must have at least Dimension, Type and one Software column');
 
@@ -312,8 +345,8 @@ function App() {
         const newDimensions: Dimension[] = [];
         
         // 2. Process Data Rows
-        for(let i = 1; i < lines.length; i++) {
-           const row = parseCSVLine(lines[i]);
+        for(let i = 1; i < cleanRows.length; i++) {
+           const row = cleanRows[i];
            if(row.length < 3) continue;
            
            const dimName = row[0].trim();
