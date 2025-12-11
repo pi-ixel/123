@@ -415,7 +415,7 @@ function App() {
         </div>
 
         {/* Visualization & Table */}
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 mb-8">
+        <div className="flex flex-col gap-8 mb-8">
           <div className="flex flex-col space-y-4">
              <h2 className="text-xl font-semibold text-white">可视化对比</h2>
              <RadarChartVis softwares={softwares} dimensions={dimensions} />
