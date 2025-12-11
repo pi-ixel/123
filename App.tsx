@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useRef } from 'react';
+import React, { useState, useCallback, useRef, useEffect } from 'react';
 import { INITIAL_DIMENSIONS, INITIAL_SOFTWARES } from './constants';
 import { Dimension, Software } from './types';
 import RadarChartVis from './components/RadarChartVis';
@@ -13,7 +13,8 @@ import {
   Save,
   MessageSquare,
   Download,
-  Upload
+  Upload,
+  RotateCcw
 } from 'lucide-react';
 
 // Simple unique ID generator
@@ -53,10 +54,41 @@ const parseCSVLine = (line: string) => {
   return result;
 };
 
+// Storage Keys
+const STORAGE_KEY_DIMS = 'av_benchmark_dimensions_v1';
+const STORAGE_KEY_SW = 'av_benchmark_softwares_v1';
+
 function App() {
-  const [dimensions, setDimensions] = useState<Dimension[]>(INITIAL_DIMENSIONS);
-  const [softwares, setSoftwares] = useState<Software[]>(INITIAL_SOFTWARES);
+  // Initialize state from LocalStorage if available, otherwise use defaults
+  const [dimensions, setDimensions] = useState<Dimension[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_DIMS);
+      return saved ? JSON.parse(saved) : INITIAL_DIMENSIONS;
+    } catch (e) {
+      console.warn('Failed to load dimensions from storage', e);
+      return INITIAL_DIMENSIONS;
+    }
+  });
+
+  const [softwares, setSoftwares] = useState<Software[]>(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY_SW);
+      return saved ? JSON.parse(saved) : INITIAL_SOFTWARES;
+    } catch (e) {
+      console.warn('Failed to load softwares from storage', e);
+      return INITIAL_SOFTWARES;
+    }
+  });
   
+  // Persistence Effects
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_DIMS, JSON.stringify(dimensions));
+  }, [dimensions]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEY_SW, JSON.stringify(softwares));
+  }, [softwares]);
+
   // UI State for Modals/Panels
   const [showAddSoftware, setShowAddSoftware] = useState(false);
   const [showAddDimension, setShowAddDimension] = useState(false);
@@ -162,6 +194,15 @@ function App() {
 
   const handleDeleteDimension = (id: string) => {
     setDimensions(prev => prev.filter(d => d.id !== id));
+  };
+
+  // Reset Handler
+  const handleReset = () => {
+    if (window.confirm('确定要重置所有数据到默认状态吗？这将清除您所有的自定义修改。')) {
+      setDimensions(INITIAL_DIMENSIONS);
+      setSoftwares(INITIAL_SOFTWARES);
+      // Effects will automatically update localStorage
+    }
   };
 
   // --- Drag and Drop Handlers ---
@@ -343,6 +384,14 @@ function App() {
         <div className="flex items-center gap-3 w-full md:w-auto flex-wrap justify-center">
             {/* Export/Import Group */}
             <div className="flex items-center gap-2 mr-2">
+              <button 
+                onClick={handleReset}
+                className="flex items-center gap-2 px-3 py-2 bg-gray-700 hover:bg-gray-600 text-gray-300 rounded-lg transition-all text-sm font-medium border border-gray-600 hover:border-red-500 hover:text-red-400"
+                title="重置到默认数据"
+              >
+                <RotateCcw size={16} />
+              </button>
+              <div className="w-px h-6 bg-gray-600 mx-1"></div>
               <button 
                 onClick={handleExportCSV}
                 className="flex items-center gap-2 px-3 py-2 bg-gray-700 hover:bg-gray-600 text-gray-200 rounded-lg transition-all text-sm font-medium border border-gray-600"
